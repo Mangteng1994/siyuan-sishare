@@ -1,0 +1,227 @@
+.sishare-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 2px 12px;
+}
+
+.sishare-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sishare-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.sishare-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sishare-label {
+  font-size: 13px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+.sishare-checkbox {
+  justify-content: end;
+}
+
+.sishare-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--b3-theme-surface-lighter);
+  color: var(--b3-theme-on-surface-light);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.sishare-share-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sishare-card {
+  padding: 16px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 14px;
+  background: var(--b3-theme-surface);
+}
+
+.sishare-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.sishare-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.sishare-card-meta {
+  margin-top: 4px;
+  color: var(--b3-theme-on-surface-light);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.sishare-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 70px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sishare-status--success {
+  background: rgba(46, 160, 67, 0.14);
+  color: #2ea043;
+}
+
+.sishare-status--pending {
+  background: rgba(251, 188, 5, 0.18);
+  color: #b26a00;
+}
+
+.sishare-status--failed {
+  background: rgba(210, 63, 49, 0.14);
+  color: #d23f31;
+}
+
+.sishare-grid {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+}
+
+.sishare-grid-label {
+  color: var(--b3-theme-on-surface-light);
+  font-size: 13px;
+}
+
+.sishare-grid-value {
+  min-width: 0;
+  word-break: break-all;
+}
+
+.sishare-grid-value a {
+  color: var(--b3-theme-primary);
+  text-decoration: none;
+}
+
+.sishare-grid-value a:hover {
+  text-decoration: underline;
+}
+
+.sishare-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sishare-error {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(210, 63, 49, 0.08);
+  color: #d23f31;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.sishare-empty {
+  padding: 32px 16px;
+  border: 1px dashed var(--b3-border-color);
+  border-radius: 14px;
+  color: var(--b3-theme-on-surface-light);
+  text-align: center;
+}
+
+.sishare-progress {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1200;
+}
+
+.sishare-progress-card {
+  width: 280px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--b3-theme-surface);
+  box-shadow: var(--b3-dialog-shadow);
+  border: 1px solid var(--b3-border-color);
+}
+
+.sishare-progress-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sishare-progress-text {
+  margin-top: 8px;
+  color: var(--b3-theme-on-surface-light);
+  font-size: 13px;
+}
+
+.sishare-progress-track {
+  margin-top: 12px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--b3-theme-surface-lighter);
+  overflow: hidden;
+}
+
+.sishare-progress-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--b3-theme-primary);
+  transition: width 160ms ease;
+}
+
+.sishare-progress-bar[data-error="true"] {
+  background: #d23f31;
+}
+
+.sishare-progress-percent {
+  margin-top: 8px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+@media (max-width: 860px) {
+  .sishare-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sishare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sishare-progress {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .sishare-progress-card {
+    width: auto;
+  }
+}

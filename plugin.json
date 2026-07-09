@@ -1,0 +1,36 @@
+{
+  "name": "siyuan-sishare",
+  "author": "liuyufeng1108",
+  "version": "0.1.0",
+  "minAppVersion": "3.6.5",
+  "backends": [
+    "windows",
+    "linux",
+    "darwin"
+  ],
+  "frontends": [
+    "desktop"
+  ],
+  "displayName": {
+    "default": "Cloud Pages Share",
+    "zh_CN": "云端静态分享"
+  },
+  "description": {
+    "default": "Publish the active SiYuan note as static HTML to siyuan-cloud mounted S3 storage.",
+    "zh_CN": "将当前思源笔记导出为静态 HTML 并上传到 siyuan-cloud 挂载的 S3 网盘。"
+  },
+  "readme": {
+    "default": "README.md",
+    "zh_CN": "README.md"
+  },
+  "keywords": [
+    "siyuan",
+    "share",
+    "static",
+    "html",
+    "s3",
+    "cloud",
+    "发布"
+  ],
+  "license": "MIT"
+}
