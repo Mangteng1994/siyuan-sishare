@@ -1,6 +1,6 @@
 {
   "name": "siyuan-sishare",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Standalone SiYuan plugin for publishing the active note as static HTML to siyuan-cloud mounted S3 storage.",
   "scripts": {

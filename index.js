@@ -1172,6 +1172,8 @@ function buildSiYuanNativeHTML(content, title, options) {
   const mode = Number(appearance.mode || 0);
   const themeName = mode === 1 ? darkTheme : lightTheme;
   const themeMode = mode === 1 ? "dark" : "light";
+  const tocStateClass = prepared.hasToc ? "" : " pages-pub-toc--empty";
+  const bodyStateClass = prepared.hasToc ? "" : " pages-pub-no-toc";
   return `<!DOCTYPE html>
 <html lang="${escapeAttr2(lang)}" data-theme-mode="${escapeAttr2(themeMode)}">
 <head>
@@ -1183,42 +1185,45 @@ function buildSiYuanNativeHTML(content, title, options) {
   <link rel="stylesheet" href="${escapeAttr2(options.sharedBase)}/appearance/themes/${escapeAttr2(themeName)}/theme.css?v=${escapeAttr2(options.buildToken)}">
   <style>
     body { margin: 0; background: var(--b3-theme-background); color: var(--b3-theme-on-background); }
-    .pages-pub-shell { max-width: 1320px; margin: 0 auto; padding: 32px 20px 80px; display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; }
-    .pages-pub-main { min-width: 0; }
-    .pages-pub-header { margin-bottom: 24px; padding: 24px 28px; border-radius: 18px; background: var(--b3-theme-surface); box-shadow: var(--b3-point-shadow); }
-    .pages-pub-title { font-size: 30px; font-weight: 700; line-height: 1.25; word-break: break-word; }
-    .pages-pub-meta { margin-top: 8px; color: var(--b3-theme-on-surface-light); font-size: 14px; }
-    .pages-pub-article { padding: 28px; border-radius: 18px; background: var(--b3-theme-surface); box-shadow: var(--b3-point-shadow); overflow-x: auto; }
-    .pages-pub-toc { position: sticky; top: 20px; align-self: start; padding: 18px; border-radius: 18px; background: var(--b3-theme-surface); box-shadow: var(--b3-point-shadow); max-height: calc(100vh - 40px); overflow: auto; }
-    .pages-pub-toc-title { margin-bottom: 12px; font-size: 14px; font-weight: 700; color: var(--b3-theme-on-surface-light); }
-    .pages-pub-toc-link { display: block; padding: 8px 10px; border-radius: 10px; color: inherit; text-decoration: none; word-break: break-word; }
-    .pages-pub-toc-link:hover { background: var(--b3-theme-surface-lighter); }
-    .toc-level-2 { padding-left: 20px; }
-    .toc-level-3 { padding-left: 30px; font-size: 13px; }
-    .pages-pub-toc-empty { color: var(--b3-theme-on-surface-light); font-size: 13px; }
-    @media (max-width: 960px) {
-      .pages-pub-shell { grid-template-columns: 1fr; padding-inline: 12px; }
-      .pages-pub-toc { position: static; max-height: none; order: -1; }
-      .pages-pub-header, .pages-pub-article { padding: 18px; }
-      .pages-pub-title { font-size: 24px; }
+    .pages-pub-layout { max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
+    .pages-pub-main { min-width: 0; margin-left: 320px; }
+    .pages-pub-main .protyle-wysiwyg { overflow-x: auto; }
+    #pages-pub-toc { position: fixed; top: 24px; left: max(24px, calc(50vw - 616px)); width: 260px; max-height: calc(100vh - 48px); overflow: auto; border: 1px solid var(--b3-border-color); border-radius: 16px; background: color-mix(in srgb, var(--b3-theme-background) 92%, var(--b3-theme-surface) 8%); box-shadow: 0 8px 30px rgba(0,0,0,.08); }
+    .pages-pub-toc__head { padding: 16px 16px 10px; border-bottom: 1px solid var(--b3-border-color); }
+    .pages-pub-toc__title { font-size: 14px; font-weight: 600; color: var(--b3-theme-on-background); }
+    .pages-pub-toc__body { padding: 10px 8px 14px; }
+    .pages-pub-toc__list { display: flex; flex-direction: column; gap: 2px; }
+    .pages-pub-toc-link { display: block; padding: 7px 10px; border-radius: 10px; color: var(--b3-theme-on-background); text-decoration: none; font-size: 13px; line-height: 1.5; word-break: break-word; transition: background-color .2s, color .2s; }
+    .pages-pub-toc-link:hover { background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); }
+    .pages-pub-toc-link.toc-level-2 { padding-left: 22px; }
+    .pages-pub-toc-link.toc-level-3 { padding-left: 34px; }
+    .pages-pub-toc-empty { padding: 8px 10px; color: var(--b3-theme-on-surface-light); font-size: 13px; }
+    body.pages-pub-no-toc .pages-pub-main { margin-left: 0; }
+    #pages-pub-toc.pages-pub-toc--empty { display: none; }
+    @media (max-width: 1100px) {
+      .pages-pub-layout { padding: 20px 16px 48px; }
+      .pages-pub-main { margin-left: 0; }
+      #pages-pub-toc { position: static; left: auto; width: auto; max-height: none; margin-bottom: 16px; }
     }
   </style>
 </head>
-<body>
-  <div class="pages-pub-shell">
-    <main class="pages-pub-main">
-      <section class="pages-pub-header">
-        <div class="pages-pub-title">${escapeHtml2(title || "Untitled")}</div>
-        <div class="pages-pub-meta">Published by siyuan-sishare</div>
-      </section>
-      <article class="pages-pub-article protyle-wysiwyg protyle-wysiwyg--attr">
-        ${prepared.contentHtml}
-      </article>
-    </main>
-    <aside class="pages-pub-toc">
-      <div class="pages-pub-toc-title">\u76EE\u5F55</div>
-      ${prepared.tocHtml}
+<body class="${bodyStateClass.trim()}">
+  <div class="pages-pub-layout">
+    <aside id="pages-pub-toc" aria-label="\u76EE\u5F55" class="${tocStateClass.trim()}">
+      <div class="pages-pub-toc__head">
+        <div class="pages-pub-toc__title">\u76EE\u5F55</div>
+      </div>
+      <div class="pages-pub-toc__body">
+        <div class="pages-pub-toc__list">
+          ${prepared.tocHtml}
+        </div>
+      </div>
     </aside>
+    <main class="pages-pub-main">
+      <div class="protyle-wysiwyg protyle-wysiwyg--attr" id="preview">
+        ${prepared.contentHtml}
+      </div>
+    </main>
   </div>
 </body>
 </html>`;
@@ -1228,7 +1233,8 @@ function preparePublishedContent(content, options) {
   if (!parser) {
     return {
       contentHtml: content,
-      tocHtml: '<div class="pages-pub-toc-empty">\u6682\u65E0\u76EE\u5F55</div>'
+      tocHtml: '<div class="pages-pub-toc-empty">\u6682\u65E0\u76EE\u5F55</div>',
+      hasToc: false
     };
   }
   const doc = parser.parseFromString(`<div id="pages-pub-root">${content}</div>`, "text/html");
@@ -1236,7 +1242,8 @@ function preparePublishedContent(content, options) {
   if (!root) {
     return {
       contentHtml: content,
-      tocHtml: '<div class="pages-pub-toc-empty">\u6682\u65E0\u76EE\u5F55</div>'
+      tocHtml: '<div class="pages-pub-toc-empty">\u6682\u65E0\u76EE\u5F55</div>',
+      hasToc: false
     };
   }
   const copiedMap = /* @__PURE__ */ new Map();
@@ -1255,7 +1262,8 @@ function preparePublishedContent(content, options) {
   const tocItems = buildStaticTocData(root);
   return {
     contentHtml: root.innerHTML,
-    tocHtml: tocItems.length ? tocItems.map((item) => `<a class="pages-pub-toc-link toc-level-${item.level}" href="#${escapeAttr2(item.id)}">${escapeHtml2(item.text)}</a>`).join("") : '<div class="pages-pub-toc-empty">\u6682\u65E0\u76EE\u5F55</div>'
+    tocHtml: tocItems.length ? tocItems.map((item) => `<a class="pages-pub-toc-link toc-level-${item.level}" href="#${escapeAttr2(item.id)}">${escapeHtml2(item.text)}</a>`).join("") : '<div class="pages-pub-toc-empty">\u6682\u65E0\u76EE\u5F55</div>',
+    hasToc: tocItems.length > 0
   };
 }
 function rewritePublishedResourcePath(ref, options) {
