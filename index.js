@@ -329,9 +329,10 @@ var CloudPagesPanel = class {
       this.dialog = new import_siyuan.Dialog({
         title: "\u4E91\u7AEF\u9759\u6001\u5206\u4EAB",
         content: `<div class="sishare-panel" data-plugin="${this.pluginName}"></div>`,
-        width: "960px",
-        height: "72vh"
+        width: "1040px",
+        height: "82vh"
       });
+      this.dialog.element.classList.add("sishare-setting-dialog");
       this.root = this.dialog.element.querySelector(".sishare-panel");
     }
     this.render();
@@ -1623,6 +1624,11 @@ function safeReadDir(dir) {
 }
 
 // src/index.ts
+var SHARE_TOPBAR_ICON = `
+  <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+    <path d="M512 0C229.23 0 0 229.23 0 512s229.23 512 512 512 512-229.23 512-512S794.77 0 512 0z m150.888 822.576c-56.452 0-102.807-43.195-107.838-98.335l-175.252-71.917c-16.481 10.135-35.881 15.985-56.648 15.985-59.812 0-108.299-48.487-108.299-108.299s48.487-108.299 108.299-108.299c11.68 0 22.925 1.857 33.464 5.278l128.185-128.185c-4.694-12.125-7.274-25.303-7.274-39.084 0-59.812 48.487-108.299 108.299-108.299s108.299 48.487 108.299 108.299c0 59.812-48.487 108.299-108.299 108.299-19.668 0-38.11-5.244-54.008-14.408L414.149 501.277c10.943 16.92 17.299 37.083 17.299 58.733 0 11.697-1.862 22.958-5.293 33.51l146.883 60.275c19.456-28.847 52.437-47.818 89.849-47.818 59.812 0 108.299 48.487 108.299 108.299s-48.486 108.3-108.298 108.3z" fill="currentColor"/>
+  </svg>
+`;
 var SiSharePlugin = class extends import_siyuan3.Plugin {
   progress = new ProgressOverlay();
   store;
@@ -1641,7 +1647,7 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
     this.eventBus.on("switch-protyle", this.boundHandleSwitchProtyle);
     this.eventBus.on("loaded-protyle-dynamic", this.boundHandleSwitchProtyle);
     this.addTopBar({
-      icon: "iconShare",
+      icon: SHARE_TOPBAR_ICON,
       title: "\u4E91\u7AEF\u9759\u6001\u5206\u4EAB",
       callback: () => {
         this.openSetting();

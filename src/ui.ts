@@ -37,9 +37,10 @@ export class CloudPagesPanel {
       this.dialog = new Dialog({
         title: "云端静态分享",
         content: `<div class="sishare-panel" data-plugin="${this.pluginName}"></div>`,
-        width: "960px",
-        height: "72vh",
+        width: "1040px",
+        height: "82vh",
       });
+      this.dialog.element.classList.add("sishare-setting-dialog");
       this.root = this.dialog.element.querySelector(".sishare-panel") as HTMLElement | null;
     }
     this.render();
