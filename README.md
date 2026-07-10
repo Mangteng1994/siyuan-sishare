@@ -2,6 +2,14 @@
 
 一个独立的思源笔记插件仓库，用于把当前活跃文档导出为静态 HTML，并上传到 `siyuan-cloud` 已挂载的 S3 网盘路径中，再通过 `publicBaseUrl` 生成公网访问链接。
 
+## 数据由自己掌控
+
+云端静态分享会把导出的页面和资源直接保存到你自己的 S3 网盘中，让分享数据完全掌握在自己手中。
+
+与 [siyuan-plugin-gitee-pages](https://github.com/Mangteng1994/siyuan-plugin-gitee-pages) 不同，本插件不需要建立或维护本地 Git 仓库，而是通过 `siyuan-cloud` 直接上传到你配置的云端存储。
+
+首次使用请参考：[云端静态分享（siyuan-sishare）完整配置教程（脱敏公开版）](https://mangteng1994.github.io/%E4%BA%91%E7%AB%AF%E9%9D%99%E6%80%81%E5%88%86%E4%BA%AB%EF%BC%88siyuan-sishare%EF%BC%89%E5%AE%8C%E6%95%B4%E9%85%8D%E7%BD%AE%E6%95%99%E7%A8%8B%EF%BC%88%E8%84%B1%E6%95%8F%E5%85%AC%E5%BC%80%E7%89%88%EF%BC%89/)。
+
 ## 当前实现范围
 
 - 新建独立插件工程，不依赖 `siyuan-plugin-gitee-pages` 原仓库源码路径

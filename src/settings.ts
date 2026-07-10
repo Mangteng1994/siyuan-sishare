@@ -1,4 +1,4 @@
-export type SlugMode = "title-docid";
+export type SlugMode = "title-docid" | "title";
 
 export interface CloudStorageMount {
   id: number;
@@ -38,7 +38,7 @@ export function normalizeSettings(input: unknown): CloudPagesSettings {
     publicBaseUrl: String(source.publicBaseUrl || "").trim().replace(/\/+$/, ""),
     previewBaseUrl: String(source.previewBaseUrl || "").trim().replace(/\/+$/, ""),
     uploadSharedAssets: source.uploadSharedAssets !== false,
-    slugMode: source.slugMode === "title-docid" ? "title-docid" : "title-docid",
+    slugMode: source.slugMode === "title" ? "title" : "title-docid",
   };
 }
 

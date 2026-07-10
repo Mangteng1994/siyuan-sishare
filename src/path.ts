@@ -40,7 +40,7 @@ export function joinUrl(...parts: string[]): string {
   return url.replace(/([^:])\/{2,}/g, "$1/");
 }
 
-export function safeSlug(title: string, docId: string): string {
+export function safeTitleSlug(title: string): string {
   const normalizedTitle = String(title || "")
     .normalize("NFKC")
     .replace(/\s+/g, "-")
@@ -48,7 +48,11 @@ export function safeSlug(title: string, docId: string): string {
     .replace(/[^\p{L}\p{N}_-]+/gu, "-")
     .replace(/-+/g, "-")
     .replace(/^[-_.]+|[-_.]+$/g, "");
-  const base = normalizedTitle || "untitled";
+  return (normalizedTitle || "untitled").slice(0, 96);
+}
+
+export function safeSlug(title: string, docId: string): string {
+  const base = safeTitleSlug(title);
   const safeDocId = String(docId || "").replace(/[^a-zA-Z0-9]/g, "");
   const suffix = safeDocId.slice(-8) || crypto.createHash("md5").update(`${title}:${docId}`).digest("hex").slice(0, 8);
   return `${base}-${suffix}`.slice(0, 96);

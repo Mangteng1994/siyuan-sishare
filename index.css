@@ -65,6 +65,58 @@
   color: var(--b3-theme-on-surface);
 }
 
+.sishare-token-field {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.sishare-token-field input {
+  min-width: 0;
+  padding-right: 42px !important;
+}
+
+.sishare-token-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: var(--b3-theme-on-surface-light);
+  background: transparent;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.sishare-token-toggle:hover {
+  color: var(--b3-theme-primary);
+  background: var(--b3-theme-primary-lightest);
+}
+
+.sishare-token-toggle:focus-visible {
+  color: var(--b3-theme-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--b3-theme-primary-light);
+}
+
+.sishare-token-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
 .sishare-checkbox {
   justify-content: end;
 }
@@ -82,6 +134,66 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.sishare-share-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sishare-share-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--b3-theme-surface) 82%, var(--b3-theme-background));
+}
+
+.sishare-share-title-row,
+.sishare-share-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sishare-share-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--b3-theme-on-surface);
+  white-space: nowrap;
+}
+
+.sishare-share-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 999px;
+  color: var(--b3-theme-on-surface-light);
+  background: var(--b3-theme-background);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.sishare-share-tools {
+  flex: 1 1 360px;
+  justify-content: flex-end;
+}
+
+.sishare-share-search {
+  width: min(420px, 100%);
+  min-width: 160px;
+  border-radius: 999px !important;
 }
 
 .sishare-card {
@@ -189,6 +301,32 @@
   text-align: center;
 }
 
+.sishare-tree-share-anchor {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sishare-tree-share-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  margin-left: 4px;
+  color: #8b5cf6;
+  flex: 0 0 auto;
+  vertical-align: middle;
+  opacity: .92;
+}
+
+.sishare-tree-share-icon svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
 .sishare-progress {
   position: fixed;
   right: 20px;
@@ -257,6 +395,15 @@
 
   .sishare-settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sishare-share-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sishare-share-tools {
+    flex-basis: auto;
   }
 
   .sishare-grid {

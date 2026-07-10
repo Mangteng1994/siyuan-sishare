@@ -69,9 +69,12 @@ function joinUrl(...parts) {
   }
   return url.replace(/([^:])\/{2,}/g, "$1/");
 }
-function safeSlug(title, docId) {
+function safeTitleSlug(title) {
   const normalizedTitle = String(title || "").normalize("NFKC").replace(/\s+/g, "-").replace(/[/?%*:|"<>#\\[\]{}^`~]+/g, "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/-+/g, "-").replace(/^[-_.]+|[-_.]+$/g, "");
-  const base = normalizedTitle || "untitled";
+  return (normalizedTitle || "untitled").slice(0, 96);
+}
+function safeSlug(title, docId) {
+  const base = safeTitleSlug(title);
   const safeDocId = String(docId || "").replace(/[^a-zA-Z0-9]/g, "");
   const suffix = safeDocId.slice(-8) || import_node_crypto.default.createHash("md5").update(`${title}:${docId}`).digest("hex").slice(0, 8);
   return `${base}-${suffix}`.slice(0, 96);
@@ -177,7 +180,7 @@ function normalizeSettings(input) {
     publicBaseUrl: String(source.publicBaseUrl || "").trim().replace(/\/+$/, ""),
     previewBaseUrl: String(source.previewBaseUrl || "").trim().replace(/\/+$/, ""),
     uploadSharedAssets: source.uploadSharedAssets !== false,
-    slugMode: source.slugMode === "title-docid" ? "title-docid" : "title-docid"
+    slugMode: source.slugMode === "title" ? "title" : "title-docid"
   };
 }
 function normalizeRemoteRoot(value) {
@@ -259,7 +262,7 @@ var ShareStore = class {
     return this.getSettings();
   }
   getShares() {
-    return this.data.shares.map((item) => ({ ...item })).sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+    return this.data.shares.map((item) => ({ ...item })).sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
   }
   findByDocId(docId) {
     return this.getShares().find((item) => item.docId === docId);
@@ -319,6 +322,8 @@ var CloudPagesPanel = class {
   root = null;
   state = null;
   handlers = null;
+  searchQuery = "";
+  tokenVisible = false;
   constructor(pluginName) {
     this.pluginName = pluginName;
   }
@@ -357,7 +362,10 @@ var CloudPagesPanel = class {
     settings.innerHTML = `
       <label class="sishare-field">
         <span class="sishare-label">siyuan-cloud Token</span>
-        <input class="b3-text-field fn__block" type="password" id="sishare-cloudToken" value="${escapeAttr(this.state.settings.cloudToken)}" placeholder="X-Siyuan-Cloud-Authorization">
+        <span class="sishare-token-field">
+          <input class="b3-text-field fn__block" type="${this.tokenVisible ? "text" : "password"}" id="sishare-cloudToken" value="${escapeAttr(this.state.settings.cloudToken)}" placeholder="X-Siyuan-Cloud-Authorization">
+          <button class="sishare-token-toggle" type="button" data-action="toggle-token" aria-pressed="${this.tokenVisible}" aria-label="${this.tokenVisible ? "\u9690\u85CF Token" : "\u663E\u793A Token"}" title="${this.tokenVisible ? "\u9690\u85CF Token" : "\u663E\u793A Token"}">${tokenVisibilityIcon(this.tokenVisible)}</button>
+        </span>
       </label>
       <label class="sishare-field">
         <span class="sishare-label">\u5206\u4EAB\u7F51\u76D8\uFF08\u4EC5 S3\uFF09</span>
@@ -377,7 +385,8 @@ var CloudPagesPanel = class {
       <label class="sishare-field">
         <span class="sishare-label">Slug \u7B56\u7565</span>
         <select class="b3-select fn__block" id="sishare-slugMode">
-          <option value="title-docid" selected>\u6807\u9898 + docId \u540E 8 \u4F4D</option>
+          <option value="title-docid" ${this.state.settings.slugMode === "title-docid" ? "selected" : ""}>\u6807\u9898 + docId \u540E 8 \u4F4D</option>
+          <option value="title" ${this.state.settings.slugMode === "title" ? "selected" : ""}>\u6807\u9898</option>
         </select>
       </label>
       <label class="sishare-field sishare-checkbox">
@@ -386,23 +395,70 @@ var CloudPagesPanel = class {
       </label>
     `;
     this.root.appendChild(settings);
+    settings.querySelector('[data-action="toggle-token"]')?.addEventListener("click", () => {
+      this.tokenVisible = !this.tokenVisible;
+      const input = settings.querySelector("#sishare-cloudToken");
+      const button = settings.querySelector('[data-action="toggle-token"]');
+      if (input) input.type = this.tokenVisible ? "text" : "password";
+      if (button) {
+        const label = this.tokenVisible ? "\u9690\u85CF Token" : "\u663E\u793A Token";
+        button.innerHTML = tokenVisibilityIcon(this.tokenVisible);
+        button.setAttribute("aria-pressed", String(this.tokenVisible));
+        button.setAttribute("aria-label", label);
+        button.title = label;
+      }
+    });
     const note = document.createElement("div");
     note.className = "sishare-note";
     note.textContent = "\u4E0A\u4F20\u76EE\u5F55\u4F1A\u76F4\u63A5\u53D6\u6E90\u6587\u4EF6\u6839\u5730\u5740\u4E2D\u7684\u8DEF\u5F84\u90E8\u5206\uFF1B\u5982\u679C\u586B\u5199\u9884\u89C8\u6839\u5730\u5740\uFF0C\u5206\u4EAB\u5361\u7247\u548C\u590D\u5236\u94FE\u63A5\u4F1A\u4F18\u5148\u4F7F\u7528\u9884\u89C8\u94FE\u63A5\u3002";
     this.root.appendChild(note);
-    const list = document.createElement("div");
-    list.className = "sishare-share-list";
-    if (!this.state.shares.length) {
-      list.innerHTML = '<div class="sishare-empty">\u8FD8\u6CA1\u6709\u5206\u4EAB\u8BB0\u5F55\uFF0C\u5148\u6253\u5F00\u4E00\u7BC7\u7B14\u8BB0\u518D\u70B9\u51FB\u201C\u5206\u4EAB\u5F53\u524D\u6587\u6863\u201D\u3002</div>';
-    } else {
-      for (const record of this.state.shares) {
-        list.appendChild(this.createShareCard(record));
-      }
-    }
-    this.root.appendChild(list);
+    const shareSection = document.createElement("section");
+    shareSection.className = "sishare-share-section";
+    shareSection.innerHTML = `
+      <div class="sishare-share-head">
+        <div class="sishare-share-title-row">
+          <h2 class="sishare-share-title">\u5206\u4EAB\u5217\u8868</h2>
+          <span class="sishare-share-count">0 \u6761</span>
+        </div>
+        <div class="sishare-share-tools">
+          <input class="b3-text-field sishare-share-search" type="search" placeholder="\u641C\u7D22\u6587\u6863\u6807\u9898" value="${escapeAttr(this.searchQuery)}" spellcheck="false">
+          <button class="b3-button b3-button--outline" data-action="refresh-shares" ${this.state.busy ? "disabled" : ""}>\u5237\u65B0</button>
+        </div>
+      </div>
+      <div class="sishare-share-list"></div>
+    `;
+    this.root.appendChild(shareSection);
+    const searchInput = shareSection.querySelector(".sishare-share-search");
+    const list = shareSection.querySelector(".sishare-share-list");
+    const count = shareSection.querySelector(".sishare-share-count");
+    this.renderShareRecords(list, count);
+    searchInput?.addEventListener("input", () => {
+      this.searchQuery = searchInput.value || "";
+      this.renderShareRecords(list, count);
+    });
+    shareSection.querySelector('[data-action="refresh-shares"]')?.addEventListener("click", () => this.handlers?.onRefreshShares());
     toolbar.querySelector('[data-action="publish"]')?.addEventListener("click", () => this.handlers?.onPublishCurrent());
     toolbar.querySelector('[data-action="refresh"]')?.addEventListener("click", () => this.handlers?.onRefreshStorages());
     toolbar.querySelector('[data-action="save"]')?.addEventListener("click", () => this.saveSettingsFromForm());
+  }
+  renderShareRecords(list, count) {
+    if (!list || !this.state) return;
+    const keyword = this.searchQuery.trim().toLocaleLowerCase();
+    const records = this.state.shares.filter((record) => {
+      if (!keyword) return true;
+      return String(record.title || "").toLocaleLowerCase().includes(keyword);
+    });
+    if (count) {
+      count.textContent = keyword ? `${records.length} / ${this.state.shares.length} \u6761` : `${this.state.shares.length} \u6761`;
+    }
+    list.innerHTML = "";
+    if (!records.length) {
+      list.innerHTML = keyword ? '<div class="sishare-empty">\u672A\u627E\u5230\u5339\u914D\u7684\u5206\u4EAB\u6587\u6863</div>' : '<div class="sishare-empty">\u8FD8\u6CA1\u6709\u5206\u4EAB\u8BB0\u5F55\uFF0C\u5148\u6253\u5F00\u4E00\u7BC7\u7B14\u8BB0\u518D\u70B9\u51FB\u201C\u5206\u4EAB\u5F53\u524D\u6587\u6863\u201D\u3002</div>';
+      return;
+    }
+    for (const record of records) {
+      list.appendChild(this.createShareCard(record));
+    }
   }
   async saveSettingsFromForm() {
     if (!this.root || !this.handlers) return;
@@ -415,7 +471,7 @@ var CloudPagesPanel = class {
       storageMountPath: storage?.mount_path || "",
       publicBaseUrl: this.root.querySelector("#sishare-publicBaseUrl")?.value || "",
       previewBaseUrl: this.root.querySelector("#sishare-previewBaseUrl")?.value || "",
-      slugMode: "title-docid",
+      slugMode: this.root.querySelector("#sishare-slugMode")?.value === "title" ? "title" : "title-docid",
       uploadSharedAssets: !!this.root.querySelector("#sishare-uploadSharedAssets")?.checked
     });
   }
@@ -524,6 +580,9 @@ function formatDateTime(value) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+function tokenVisibilityIcon(visible) {
+  return visible ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9 5.2 9 5.2a14.7 14.7 0 0 1-2.1 2.6M6.6 6.6A15.8 15.8 0 0 0 3 9.2S6.5 14.4 12 14.4c1 0 2-.2 2.8-.5"></path></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5S6.5 4.3 12 4.3s9 5.2 9 5.2-3.5 5.2-9 5.2S3 9.5 3 9.5Z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>`;
 }
 
 // src/cloudApi.ts
@@ -776,8 +835,8 @@ async function getCurrentDocInfoSafe(options = {}) {
 function buildRecordId(docId, slug) {
   return `${docId}:${slug}`;
 }
-function buildSlug(title, docId) {
-  return safeSlug(title, docId);
+function buildSlug(title, docId, mode = "title-docid") {
+  return mode === "title" ? safeTitleSlug(title) : safeSlug(title, docId);
 }
 async function publishToSiyuanCloud(input) {
   validateSettings(input.settings);
@@ -785,7 +844,7 @@ async function publishToSiyuanCloud(input) {
   const warnings = [];
   const taskId = import_node_crypto2.default.randomUUID();
   const tempRoot = await createTempWorkspaceDir(taskId);
-  const slug = input.slug || buildSlug(input.title, input.docId);
+  const slug = input.slug || buildSlug(input.title, input.docId, input.settings.slugMode);
   const targetDir = import_node_path2.default.join(tempRoot, slug);
   const sharedRoot = import_node_path2.default.join(tempRoot, SHARED_ASSETS_DIR);
   const remoteRootPath = resolveRemoteRootPath(input.settings);
@@ -1635,6 +1694,8 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
   panel;
   storages = [];
   busy = false;
+  treeMarkerObserver = null;
+  treeMarkerTimer = null;
   boundHandleSwitchProtyle = (event) => {
     setCurrentProtyle(event.detail?.protyle || null);
     void refreshTrackedDocInfo("active-protyle").catch(() => {
@@ -1646,6 +1707,8 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
     this.panel = new CloudPagesPanel(this.name);
     this.eventBus.on("switch-protyle", this.boundHandleSwitchProtyle);
     this.eventBus.on("loaded-protyle-dynamic", this.boundHandleSwitchProtyle);
+    this.initTreeMarkerSync();
+    this.scheduleRefreshTreeShareMarkers();
     this.addTopBar({
       icon: SHARE_TOPBAR_ICON,
       title: "\u4E91\u7AEF\u9759\u6001\u5206\u4EAB",
@@ -1657,6 +1720,13 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
   onunload() {
     this.eventBus.off("switch-protyle", this.boundHandleSwitchProtyle);
     this.eventBus.off("loaded-protyle-dynamic", this.boundHandleSwitchProtyle);
+    this.treeMarkerObserver?.disconnect();
+    this.treeMarkerObserver = null;
+    if (this.treeMarkerTimer !== null) {
+      window.clearTimeout(this.treeMarkerTimer);
+      this.treeMarkerTimer = null;
+    }
+    document.querySelectorAll(".sishare-tree-share-icon").forEach((node) => node.remove());
     clearTrackedDocContext();
   }
   openSetting() {
@@ -1680,6 +1750,11 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
       },
       onRefreshStorages: async () => {
         await this.refreshStorages(true);
+      },
+      onRefreshShares: async () => {
+        await this.store.load();
+        this.rerenderPanel();
+        (0, import_siyuan3.showMessage)("\u5206\u4EAB\u5217\u8868\u5DF2\u5237\u65B0", 2e3, "info");
       },
       onPublishCurrent: async () => {
         await this.runTask(async () => {
@@ -1710,6 +1785,97 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
   }
   rerenderPanel() {
     this.panel.rerender(this.getPanelState());
+    this.scheduleRefreshTreeShareMarkers();
+  }
+  initTreeMarkerSync() {
+    this.treeMarkerObserver?.disconnect();
+    this.treeMarkerObserver = new MutationObserver(() => {
+      this.scheduleRefreshTreeShareMarkers();
+    });
+    this.treeMarkerObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+  scheduleRefreshTreeShareMarkers() {
+    if (this.treeMarkerTimer !== null) {
+      window.clearTimeout(this.treeMarkerTimer);
+    }
+    this.treeMarkerTimer = window.setTimeout(() => {
+      this.treeMarkerTimer = null;
+      this.refreshTreeShareMarkers();
+    }, 80);
+  }
+  getSharedDocIdSet() {
+    return new Set(
+      this.store.getShares().map((record) => String(record.docId || "").trim()).filter(Boolean)
+    );
+  }
+  getTreeItemDocId(node) {
+    if (!node) return "";
+    const element = node;
+    const candidates = [
+      element.getAttribute("data-node-id"),
+      element.dataset?.nodeId,
+      element.dataset?.id,
+      element.getAttribute("data-id")
+    ].filter(Boolean);
+    const matched = candidates.find((value) => /^\d{14}-[a-z0-9]+$/i.test(String(value).trim()));
+    return matched ? String(matched).trim() : "";
+  }
+  isLikelyTreeItem(node) {
+    if (!(node instanceof HTMLElement)) return false;
+    if (node.closest(".protyle, .protyle-wysiwyg, .block__popover, .layout-tab-bar")) return false;
+    if (!node.classList.contains("b3-list-item")) return false;
+    if (!this.getTreeItemDocId(node)) return false;
+    if (node.getAttribute("data-type") === "navigation-file") return true;
+    if (node.getAttribute("data-type") === "navigation-root") return false;
+    if (node.querySelector(".b3-list-item__toggle")) return false;
+    return !!node.closest(".sy__file, .file-tree, [data-type='sidebar-file'], [data-type='file']");
+  }
+  createTreeShareIcon(docId) {
+    const icon = document.createElement("span");
+    icon.className = "sishare-tree-share-icon";
+    icon.dataset.docId = docId;
+    icon.title = "\u5DF2\u5206\u4EAB";
+    icon.setAttribute("aria-label", "\u5DF2\u5206\u4EAB");
+    icon.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18 16a3 3 0 0 0-2.39 1.2l-6.44-3.22a3.1 3.1 0 0 0 0-1.96l6.44-3.22A3 3 0 1 0 15 7a3.1 3.1 0 0 0 .09.74L8.65 10.96a3 3 0 1 0 0 2.08l6.44 3.22A3.1 3.1 0 0 0 15 17a3 3 0 1 0 3-1Z"></path>
+      </svg>
+    `;
+    return icon;
+  }
+  refreshTreeShareMarkers() {
+    const sharedDocIds = this.getSharedDocIdSet();
+    const nodes = Array.from(document.querySelectorAll(".b3-list-item[data-node-id], .b3-list-item [data-node-id]"));
+    const visited = /* @__PURE__ */ new Set();
+    for (const node of nodes) {
+      const row = node.classList.contains("b3-list-item") ? node : node.closest(".b3-list-item");
+      if (!this.isLikelyTreeItem(row) || visited.has(row)) continue;
+      visited.add(row);
+      const docId = this.getTreeItemDocId(row) || this.getTreeItemDocId(node);
+      const existing = row.querySelector(".sishare-tree-share-icon");
+      if (!docId || !sharedDocIds.has(docId)) {
+        existing?.remove();
+        continue;
+      }
+      if (existing) continue;
+      const anchor = row.querySelector(".b3-list-item__text, .b3-list-item__name, .b3-list-item__title, .b3-list-item__label");
+      const icon = this.createTreeShareIcon(docId);
+      if (anchor) {
+        anchor.classList.add("sishare-tree-share-anchor");
+        anchor.insertAdjacentElement("afterend", icon);
+      } else {
+        row.appendChild(icon);
+      }
+    }
+    document.querySelectorAll(".sishare-tree-share-icon").forEach((icon) => {
+      const row = icon.closest(".b3-list-item");
+      if (!this.isLikelyTreeItem(row) || !sharedDocIds.has(icon.dataset.docId || this.getTreeItemDocId(row))) {
+        icon.remove();
+      }
+    });
   }
   getPanelState() {
     return {
@@ -1742,7 +1908,7 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
       throw new Error("\u672A\u80FD\u8BC6\u522B\u5F53\u524D\u6D3B\u8DC3\u6587\u6863\uFF0C\u8BF7\u5148\u70B9\u51FB\u6B63\u6587\u540E\u518D\u8BD5");
     }
     const existing = this.store.findByDocId(docInfo.docId);
-    const slug = existing?.slug || buildSlug(docInfo.title || docInfo.docId, docInfo.docId);
+    const slug = existing?.slug || buildSlug(docInfo.title || docInfo.docId, docInfo.docId, settings.slugMode);
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const remoteBasePath = deriveRemoteRootFromPublicBaseUrl(settings.publicBaseUrl);
     const baseRecord = {

@@ -13,6 +13,7 @@ export interface PanelState {
 export interface PanelHandlers {
   onSaveSettings: (settings: Partial<CloudPagesSettings>) => Promise<void>;
   onRefreshStorages: () => Promise<void>;
+  onRefreshShares: () => Promise<void>;
   onPublishCurrent: () => Promise<void>;
   onUpdateShare: (record: ShareRecord) => Promise<void>;
   onDeleteShare: (record: ShareRecord) => Promise<void>;
@@ -25,6 +26,8 @@ export class CloudPagesPanel {
   private root: HTMLElement | null = null;
   private state: PanelState | null = null;
   private handlers: PanelHandlers | null = null;
+  private searchQuery = "";
+  private tokenVisible = false;
 
   constructor(pluginName: string) {
     this.pluginName = pluginName;
@@ -69,7 +72,10 @@ export class CloudPagesPanel {
     settings.innerHTML = `
       <label class="sishare-field">
         <span class="sishare-label">siyuan-cloud Token</span>
-        <input class="b3-text-field fn__block" type="password" id="sishare-cloudToken" value="${escapeAttr(this.state.settings.cloudToken)}" placeholder="X-Siyuan-Cloud-Authorization">
+        <span class="sishare-token-field">
+          <input class="b3-text-field fn__block" type="${this.tokenVisible ? "text" : "password"}" id="sishare-cloudToken" value="${escapeAttr(this.state.settings.cloudToken)}" placeholder="X-Siyuan-Cloud-Authorization">
+          <button class="sishare-token-toggle" type="button" data-action="toggle-token" aria-pressed="${this.tokenVisible}" aria-label="${this.tokenVisible ? "隐藏 Token" : "显示 Token"}" title="${this.tokenVisible ? "隐藏 Token" : "显示 Token"}">${tokenVisibilityIcon(this.tokenVisible)}</button>
+        </span>
       </label>
       <label class="sishare-field">
         <span class="sishare-label">分享网盘（仅 S3）</span>
@@ -89,7 +95,8 @@ export class CloudPagesPanel {
       <label class="sishare-field">
         <span class="sishare-label">Slug 策略</span>
         <select class="b3-select fn__block" id="sishare-slugMode">
-          <option value="title-docid" selected>标题 + docId 后 8 位</option>
+          <option value="title-docid" ${this.state.settings.slugMode === "title-docid" ? "selected" : ""}>标题 + docId 后 8 位</option>
+          <option value="title" ${this.state.settings.slugMode === "title" ? "selected" : ""}>标题</option>
         </select>
       </label>
       <label class="sishare-field sishare-checkbox">
@@ -98,26 +105,77 @@ export class CloudPagesPanel {
       </label>
     `;
     this.root.appendChild(settings);
+    settings.querySelector('[data-action="toggle-token"]')?.addEventListener("click", () => {
+      this.tokenVisible = !this.tokenVisible;
+      const input = settings.querySelector("#sishare-cloudToken") as HTMLInputElement | null;
+      const button = settings.querySelector('[data-action="toggle-token"]') as HTMLButtonElement | null;
+      if (input) input.type = this.tokenVisible ? "text" : "password";
+      if (button) {
+        const label = this.tokenVisible ? "隐藏 Token" : "显示 Token";
+        button.innerHTML = tokenVisibilityIcon(this.tokenVisible);
+        button.setAttribute("aria-pressed", String(this.tokenVisible));
+        button.setAttribute("aria-label", label);
+        button.title = label;
+      }
+    });
 
     const note = document.createElement("div");
     note.className = "sishare-note";
     note.textContent = "上传目录会直接取源文件根地址中的路径部分；如果填写预览根地址，分享卡片和复制链接会优先使用预览链接。";
     this.root.appendChild(note);
 
-    const list = document.createElement("div");
-    list.className = "sishare-share-list";
-    if (!this.state.shares.length) {
-      list.innerHTML = '<div class="sishare-empty">还没有分享记录，先打开一篇笔记再点击“分享当前文档”。</div>';
-    } else {
-      for (const record of this.state.shares) {
-        list.appendChild(this.createShareCard(record));
-      }
-    }
-    this.root.appendChild(list);
+    const shareSection = document.createElement("section");
+    shareSection.className = "sishare-share-section";
+    shareSection.innerHTML = `
+      <div class="sishare-share-head">
+        <div class="sishare-share-title-row">
+          <h2 class="sishare-share-title">分享列表</h2>
+          <span class="sishare-share-count">0 条</span>
+        </div>
+        <div class="sishare-share-tools">
+          <input class="b3-text-field sishare-share-search" type="search" placeholder="搜索文档标题" value="${escapeAttr(this.searchQuery)}" spellcheck="false">
+          <button class="b3-button b3-button--outline" data-action="refresh-shares" ${this.state.busy ? "disabled" : ""}>刷新</button>
+        </div>
+      </div>
+      <div class="sishare-share-list"></div>
+    `;
+    this.root.appendChild(shareSection);
+
+    const searchInput = shareSection.querySelector(".sishare-share-search") as HTMLInputElement | null;
+    const list = shareSection.querySelector(".sishare-share-list") as HTMLElement | null;
+    const count = shareSection.querySelector(".sishare-share-count") as HTMLElement | null;
+    this.renderShareRecords(list, count);
+    searchInput?.addEventListener("input", () => {
+      this.searchQuery = searchInput.value || "";
+      this.renderShareRecords(list, count);
+    });
+    shareSection.querySelector('[data-action="refresh-shares"]')?.addEventListener("click", () => this.handlers?.onRefreshShares());
 
     toolbar.querySelector('[data-action="publish"]')?.addEventListener("click", () => this.handlers?.onPublishCurrent());
     toolbar.querySelector('[data-action="refresh"]')?.addEventListener("click", () => this.handlers?.onRefreshStorages());
     toolbar.querySelector('[data-action="save"]')?.addEventListener("click", () => this.saveSettingsFromForm());
+  }
+
+  private renderShareRecords(list: HTMLElement | null, count: HTMLElement | null): void {
+    if (!list || !this.state) return;
+    const keyword = this.searchQuery.trim().toLocaleLowerCase();
+    const records = this.state.shares.filter((record) => {
+      if (!keyword) return true;
+      return String(record.title || "").toLocaleLowerCase().includes(keyword);
+    });
+    if (count) {
+      count.textContent = keyword ? `${records.length} / ${this.state.shares.length} 条` : `${this.state.shares.length} 条`;
+    }
+    list.innerHTML = "";
+    if (!records.length) {
+      list.innerHTML = keyword
+        ? '<div class="sishare-empty">未找到匹配的分享文档</div>'
+        : '<div class="sishare-empty">还没有分享记录，先打开一篇笔记再点击“分享当前文档”。</div>';
+      return;
+    }
+    for (const record of records) {
+      list.appendChild(this.createShareCard(record));
+    }
   }
 
   private async saveSettingsFromForm(): Promise<void> {
@@ -131,7 +189,7 @@ export class CloudPagesPanel {
       storageMountPath: storage?.mount_path || "",
       publicBaseUrl: (this.root.querySelector("#sishare-publicBaseUrl") as HTMLInputElement | null)?.value || "",
       previewBaseUrl: (this.root.querySelector("#sishare-previewBaseUrl") as HTMLInputElement | null)?.value || "",
-      slugMode: "title-docid",
+      slugMode: (this.root.querySelector("#sishare-slugMode") as HTMLSelectElement | null)?.value === "title" ? "title" : "title-docid",
       uploadSharedAssets: !!(this.root.querySelector("#sishare-uploadSharedAssets") as HTMLInputElement | null)?.checked,
     });
   }
@@ -254,4 +312,10 @@ function formatDateTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function tokenVisibilityIcon(visible: boolean): string {
+  return visible
+    ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9 5.2 9 5.2a14.7 14.7 0 0 1-2.1 2.6M6.6 6.6A15.8 15.8 0 0 0 3 9.2S6.5 14.4 12 14.4c1 0 2-.2 2.8-.5"></path></svg>`
+    : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5S6.5 4.3 12 4.3s9 5.2 9 5.2-3.5 5.2-9 5.2S3 9.5 3 9.5Z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>`;
 }

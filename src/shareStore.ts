@@ -67,7 +67,7 @@ export class ShareStore {
   getShares(): ShareRecord[] {
     return this.data.shares
       .map((item) => ({ ...item }))
-      .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
   }
 
   findByDocId(docId: string): ShareRecord | undefined {

@@ -18,6 +18,8 @@ export default class SiSharePlugin extends Plugin {
   private panel!: CloudPagesPanel;
   private storages: CloudStorageMount[] = [];
   private busy = false;
+  private treeMarkerObserver: MutationObserver | null = null;
+  private treeMarkerTimer: number | null = null;
   private readonly boundHandleSwitchProtyle = (event: CustomEvent<{ protyle?: any }>) => {
     setCurrentProtyle(event.detail?.protyle || null);
     void refreshTrackedDocInfo("active-protyle").catch(() => {});
@@ -29,6 +31,8 @@ export default class SiSharePlugin extends Plugin {
     this.panel = new CloudPagesPanel(this.name);
     this.eventBus.on("switch-protyle", this.boundHandleSwitchProtyle);
     this.eventBus.on("loaded-protyle-dynamic", this.boundHandleSwitchProtyle);
+    this.initTreeMarkerSync();
+    this.scheduleRefreshTreeShareMarkers();
 
     this.addTopBar({
       icon: SHARE_TOPBAR_ICON,
@@ -42,6 +46,13 @@ export default class SiSharePlugin extends Plugin {
   onunload(): void {
     this.eventBus.off("switch-protyle", this.boundHandleSwitchProtyle);
     this.eventBus.off("loaded-protyle-dynamic", this.boundHandleSwitchProtyle);
+    this.treeMarkerObserver?.disconnect();
+    this.treeMarkerObserver = null;
+    if (this.treeMarkerTimer !== null) {
+      window.clearTimeout(this.treeMarkerTimer);
+      this.treeMarkerTimer = null;
+    }
+    document.querySelectorAll(".sishare-tree-share-icon").forEach((node) => node.remove());
     clearTrackedDocContext();
   }
 
@@ -67,6 +78,11 @@ export default class SiSharePlugin extends Plugin {
       },
       onRefreshStorages: async () => {
         await this.refreshStorages(true);
+      },
+      onRefreshShares: async () => {
+        await this.store.load();
+        this.rerenderPanel();
+        showMessage("分享列表已刷新", 2000, "info");
       },
       onPublishCurrent: async () => {
         await this.runTask(async () => {
@@ -98,6 +114,106 @@ export default class SiSharePlugin extends Plugin {
 
   private rerenderPanel(): void {
     this.panel.rerender(this.getPanelState());
+    this.scheduleRefreshTreeShareMarkers();
+  }
+
+  private initTreeMarkerSync(): void {
+    this.treeMarkerObserver?.disconnect();
+    this.treeMarkerObserver = new MutationObserver(() => {
+      this.scheduleRefreshTreeShareMarkers();
+    });
+    this.treeMarkerObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  private scheduleRefreshTreeShareMarkers(): void {
+    if (this.treeMarkerTimer !== null) {
+      window.clearTimeout(this.treeMarkerTimer);
+    }
+    this.treeMarkerTimer = window.setTimeout(() => {
+      this.treeMarkerTimer = null;
+      this.refreshTreeShareMarkers();
+    }, 80);
+  }
+
+  private getSharedDocIdSet(): Set<string> {
+    return new Set(
+      this.store.getShares()
+        .map((record) => String(record.docId || "").trim())
+        .filter(Boolean),
+    );
+  }
+
+  private getTreeItemDocId(node: Element | null): string {
+    if (!node) return "";
+    const element = node as HTMLElement;
+    const candidates = [
+      element.getAttribute("data-node-id"),
+      element.dataset?.nodeId,
+      element.dataset?.id,
+      element.getAttribute("data-id"),
+    ].filter(Boolean) as string[];
+    const matched = candidates.find((value) => /^\d{14}-[a-z0-9]+$/i.test(String(value).trim()));
+    return matched ? String(matched).trim() : "";
+  }
+
+  private isLikelyTreeItem(node: Element | null): node is HTMLElement {
+    if (!(node instanceof HTMLElement)) return false;
+    if (node.closest(".protyle, .protyle-wysiwyg, .block__popover, .layout-tab-bar")) return false;
+    if (!node.classList.contains("b3-list-item")) return false;
+    if (!this.getTreeItemDocId(node)) return false;
+    if (node.getAttribute("data-type") === "navigation-file") return true;
+    if (node.getAttribute("data-type") === "navigation-root") return false;
+    if (node.querySelector(".b3-list-item__toggle")) return false;
+    return !!node.closest(".sy__file, .file-tree, [data-type='sidebar-file'], [data-type='file']");
+  }
+
+  private createTreeShareIcon(docId: string): HTMLElement {
+    const icon = document.createElement("span");
+    icon.className = "sishare-tree-share-icon";
+    icon.dataset.docId = docId;
+    icon.title = "已分享";
+    icon.setAttribute("aria-label", "已分享");
+    icon.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18 16a3 3 0 0 0-2.39 1.2l-6.44-3.22a3.1 3.1 0 0 0 0-1.96l6.44-3.22A3 3 0 1 0 15 7a3.1 3.1 0 0 0 .09.74L8.65 10.96a3 3 0 1 0 0 2.08l6.44 3.22A3.1 3.1 0 0 0 15 17a3 3 0 1 0 3-1Z"></path>
+      </svg>
+    `;
+    return icon;
+  }
+
+  private refreshTreeShareMarkers(): void {
+    const sharedDocIds = this.getSharedDocIdSet();
+    const nodes = Array.from(document.querySelectorAll(".b3-list-item[data-node-id], .b3-list-item [data-node-id]"));
+    const visited = new Set<HTMLElement>();
+    for (const node of nodes) {
+      const row = node.classList.contains("b3-list-item") ? node : node.closest(".b3-list-item");
+      if (!this.isLikelyTreeItem(row) || visited.has(row)) continue;
+      visited.add(row);
+      const docId = this.getTreeItemDocId(row) || this.getTreeItemDocId(node);
+      const existing = row.querySelector(".sishare-tree-share-icon");
+      if (!docId || !sharedDocIds.has(docId)) {
+        existing?.remove();
+        continue;
+      }
+      if (existing) continue;
+      const anchor = row.querySelector(".b3-list-item__text, .b3-list-item__name, .b3-list-item__title, .b3-list-item__label");
+      const icon = this.createTreeShareIcon(docId);
+      if (anchor) {
+        anchor.classList.add("sishare-tree-share-anchor");
+        anchor.insertAdjacentElement("afterend", icon);
+      } else {
+        row.appendChild(icon);
+      }
+    }
+    document.querySelectorAll<HTMLElement>(".sishare-tree-share-icon").forEach((icon) => {
+      const row = icon.closest(".b3-list-item");
+      if (!this.isLikelyTreeItem(row) || !sharedDocIds.has(icon.dataset.docId || this.getTreeItemDocId(row))) {
+        icon.remove();
+      }
+    });
   }
 
   private getPanelState() {
@@ -133,7 +249,7 @@ export default class SiSharePlugin extends Plugin {
       throw new Error("未能识别当前活跃文档，请先点击正文后再试");
     }
     const existing = this.store.findByDocId(docInfo.docId);
-    const slug = existing?.slug || buildSlug(docInfo.title || docInfo.docId, docInfo.docId);
+    const slug = existing?.slug || buildSlug(docInfo.title || docInfo.docId, docInfo.docId, settings.slugMode);
     const now = new Date().toISOString();
     const remoteBasePath = deriveRemoteRootFromPublicBaseUrl(settings.publicBaseUrl);
     const baseRecord: ShareRecord = {

@@ -4,9 +4,9 @@ import path from "node:path";
 import crypto from "node:crypto";
 import os from "node:os";
 import { fetchSyncPost } from "siyuan";
-import { normalizeCloudPath, joinUrl, mimeFromPath, safeSlug, walkDirRecursive } from "./path";
+import { normalizeCloudPath, joinUrl, mimeFromPath, safeSlug, safeTitleSlug, walkDirRecursive } from "./path";
 import { SiyuanCloudApi } from "./cloudApi";
-import { deriveRemoteRootFromPublicBaseUrl, type CloudPagesSettings } from "./settings";
+import { deriveRemoteRootFromPublicBaseUrl, type CloudPagesSettings, type SlugMode } from "./settings";
 
 export const SHARED_ASSETS_DIR = "pages-pub-assets";
 const SHARED_ASSET_FOLDERS = ["appearance", "stage", "link-icon"];
@@ -92,8 +92,8 @@ export function buildRecordId(docId: string, slug: string): string {
   return `${docId}:${slug}`;
 }
 
-export function buildSlug(title: string, docId: string): string {
-  return safeSlug(title, docId);
+export function buildSlug(title: string, docId: string, mode: SlugMode = "title-docid"): string {
+  return mode === "title" ? safeTitleSlug(title) : safeSlug(title, docId);
 }
 
 export async function publishToSiyuanCloud(input: PublishInput): Promise<PublishOutput> {
@@ -102,7 +102,7 @@ export async function publishToSiyuanCloud(input: PublishInput): Promise<Publish
   const warnings: string[] = [];
   const taskId = crypto.randomUUID();
   const tempRoot = await createTempWorkspaceDir(taskId);
-  const slug = input.slug || buildSlug(input.title, input.docId);
+  const slug = input.slug || buildSlug(input.title, input.docId, input.settings.slugMode);
   const targetDir = path.join(tempRoot, slug);
   const sharedRoot = path.join(tempRoot, SHARED_ASSETS_DIR);
   const remoteRootPath = resolveRemoteRootPath(input.settings);
