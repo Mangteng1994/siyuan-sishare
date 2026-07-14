@@ -66,15 +66,7 @@ export default class SiSharePlugin extends Plugin {
   private renderPanel(): void {
     this.panel.open(this.getPanelState(), {
       onSaveSettings: async (settings) => {
-        const next = await this.store.updateSettings(settings);
-        const selected = this.storages.find((item) => item.id === next.storageId);
-        if (selected && selected.mount_path !== next.storageMountPath) {
-          await this.store.updateSettings({
-            storageMountPath: selected.mount_path,
-          });
-        }
-        showMessage("设置已保存", 2000, "info");
-        this.rerenderPanel();
+        await this.store.updateSettings(settings);
       },
       onRefreshStorages: async () => {
         await this.refreshStorages(true);
@@ -268,6 +260,7 @@ export default class SiSharePlugin extends Plugin {
       publicBaseUrl: settings.publicBaseUrl,
       previewBaseUrl: settings.previewBaseUrl,
       uploadSharedAssets: settings.uploadSharedAssets,
+      includeChildDocuments: settings.includeChildDocuments,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
       status: "pending",
@@ -321,6 +314,7 @@ export default class SiSharePlugin extends Plugin {
       publicBaseUrl: settings.publicBaseUrl,
       previewBaseUrl: settings.previewBaseUrl,
       uploadSharedAssets: settings.uploadSharedAssets,
+      includeChildDocuments: settings.includeChildDocuments,
       updatedAt: new Date().toISOString(),
       status: "pending",
       lastError: "",

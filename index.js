@@ -169,6 +169,7 @@ var DEFAULT_SETTINGS = {
   publicBaseUrl: "",
   previewBaseUrl: "",
   uploadSharedAssets: true,
+  includeChildDocuments: false,
   slugMode: "title-docid"
 };
 function normalizeSettings(input) {
@@ -180,6 +181,7 @@ function normalizeSettings(input) {
     publicBaseUrl: String(source.publicBaseUrl || "").trim().replace(/\/+$/, ""),
     previewBaseUrl: String(source.previewBaseUrl || "").trim().replace(/\/+$/, ""),
     uploadSharedAssets: source.uploadSharedAssets !== false,
+    includeChildDocuments: source.includeChildDocuments === true,
     slugMode: source.slugMode === "title" ? "title" : "title-docid"
   };
 }
@@ -307,6 +309,7 @@ function normalizeRecord(record) {
     publicBaseUrl: String(record.publicBaseUrl || ""),
     previewBaseUrl: String(record.previewBaseUrl || ""),
     uploadSharedAssets: record.uploadSharedAssets !== false,
+    includeChildDocuments: record.includeChildDocuments === true,
     createdAt: String(record.createdAt || record.updatedAt || now),
     updatedAt: String(record.updatedAt || now),
     status: record.status === "failed" || record.status === "pending" ? record.status : "success",
@@ -324,6 +327,7 @@ var CloudPagesPanel = class {
   handlers = null;
   searchQuery = "";
   tokenVisible = false;
+  settingsSaveQueue = Promise.resolve();
   constructor(pluginName) {
     this.pluginName = pluginName;
   }
@@ -354,7 +358,6 @@ var CloudPagesPanel = class {
     toolbar.innerHTML = `
       <button class="b3-button b3-button--outline" data-action="publish" ${this.state.busy ? "disabled" : ""}>\u5206\u4EAB\u5F53\u524D\u6587\u6863</button>
       <button class="b3-button b3-button--outline" data-action="refresh" ${this.state.busy ? "disabled" : ""}>\u5237\u65B0 S3 \u6302\u8F7D</button>
-      <button class="b3-button" data-action="save" ${this.state.busy ? "disabled" : ""}>\u4FDD\u5B58\u8BBE\u7F6E</button>
     `;
     this.root.appendChild(toolbar);
     const settings = document.createElement("div");
@@ -393,6 +396,10 @@ var CloudPagesPanel = class {
         <span class="sishare-label">\u4E0A\u4F20 pages-pub-assets</span>
         <input type="checkbox" id="sishare-uploadSharedAssets" ${this.state.settings.uploadSharedAssets ? "checked" : ""}>
       </label>
+      <label class="sishare-field sishare-checkbox">
+        <span class="sishare-label">\u5305\u542B\u5B50\u6587\u6863</span>
+        <input type="checkbox" id="sishare-includeChildDocuments" ${this.state.settings.includeChildDocuments ? "checked" : ""}>
+      </label>
     `;
     this.root.appendChild(settings);
     settings.querySelector('[data-action="toggle-token"]')?.addEventListener("click", () => {
@@ -408,9 +415,12 @@ var CloudPagesPanel = class {
         button.title = label;
       }
     });
+    settings.querySelectorAll("input, select").forEach((control) => {
+      control.addEventListener("change", () => this.queueSettingsSave());
+    });
     const note = document.createElement("div");
     note.className = "sishare-note";
-    note.textContent = "\u4E0A\u4F20\u76EE\u5F55\u4F1A\u76F4\u63A5\u53D6\u6E90\u6587\u4EF6\u6839\u5730\u5740\u4E2D\u7684\u8DEF\u5F84\u90E8\u5206\uFF1B\u5982\u679C\u586B\u5199\u9884\u89C8\u6839\u5730\u5740\uFF0C\u5206\u4EAB\u5361\u7247\u548C\u590D\u5236\u94FE\u63A5\u4F1A\u4F18\u5148\u4F7F\u7528\u9884\u89C8\u94FE\u63A5\u3002";
+    note.textContent = "\u8BBE\u7F6E\u4FEE\u6539\u540E\u81EA\u52A8\u4FDD\u5B58\u3002\u5F00\u542F\u201C\u5305\u542B\u5B50\u6587\u6863\u201D\u65F6\uFF0C\u5206\u4EAB\u4F1A\u5408\u5E76\u5F53\u524D\u6587\u6863\u4E0B\u7684\u5168\u90E8\u5B50\u6587\u6863\u3002";
     this.root.appendChild(note);
     const shareSection = document.createElement("section");
     shareSection.className = "sishare-share-section";
@@ -439,7 +449,6 @@ var CloudPagesPanel = class {
     shareSection.querySelector('[data-action="refresh-shares"]')?.addEventListener("click", () => this.handlers?.onRefreshShares());
     toolbar.querySelector('[data-action="publish"]')?.addEventListener("click", () => this.handlers?.onPublishCurrent());
     toolbar.querySelector('[data-action="refresh"]')?.addEventListener("click", () => this.handlers?.onRefreshStorages());
-    toolbar.querySelector('[data-action="save"]')?.addEventListener("click", () => this.saveSettingsFromForm());
   }
   renderShareRecords(list, count) {
     if (!list || !this.state) return;
@@ -460,19 +469,29 @@ var CloudPagesPanel = class {
       list.appendChild(this.createShareCard(record));
     }
   }
-  async saveSettingsFromForm() {
-    if (!this.root || !this.handlers) return;
+  readSettingsFromForm() {
+    if (!this.root) return null;
     const storageIdValue = this.root.querySelector("#sishare-storageId")?.value || "";
     const storageId = storageIdValue ? Number(storageIdValue) : null;
     const storage = this.state?.storages.find((item) => item.id === storageId) || null;
-    await this.handlers.onSaveSettings({
+    return {
       cloudToken: this.root.querySelector("#sishare-cloudToken")?.value || "",
       storageId,
       storageMountPath: storage?.mount_path || "",
       publicBaseUrl: this.root.querySelector("#sishare-publicBaseUrl")?.value || "",
       previewBaseUrl: this.root.querySelector("#sishare-previewBaseUrl")?.value || "",
       slugMode: this.root.querySelector("#sishare-slugMode")?.value === "title" ? "title" : "title-docid",
-      uploadSharedAssets: !!this.root.querySelector("#sishare-uploadSharedAssets")?.checked
+      uploadSharedAssets: !!this.root.querySelector("#sishare-uploadSharedAssets")?.checked,
+      includeChildDocuments: !!this.root.querySelector("#sishare-includeChildDocuments")?.checked
+    };
+  }
+  queueSettingsSave() {
+    const settings = this.readSettingsFromForm();
+    const handlers = this.handlers;
+    if (!settings || !handlers) return;
+    this.settingsSaveQueue = this.settingsSaveQueue.catch(() => {
+    }).then(() => handlers.onSaveSettings(settings)).catch((error) => {
+      (0, import_siyuan.showMessage)(`\u8BBE\u7F6E\u4FDD\u5B58\u5931\u8D25: ${formatError(error)}`, 5e3, "error");
     });
   }
   createShareCard(record) {
@@ -580,6 +599,9 @@ function formatDateTime(value) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+function formatError(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 function tokenVisibilityIcon(visible) {
   return visible ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9 5.2 9 5.2a14.7 14.7 0 0 1-2.1 2.6M6.6 6.6A15.8 15.8 0 0 0 3 9.2S6.5 14.4 12 14.4c1 0 2-.2 2.8-.5"></path></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5S6.5 4.3 12 4.3s9 5.2 9 5.2-3.5 5.2-9 5.2S3 9.5 3 9.5Z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>`;
@@ -861,7 +883,8 @@ async function publishToSiyuanCloud(input) {
       title: input.title,
       slug,
       tempRoot,
-      targetDir
+      targetDir,
+      includeChildDocuments: input.settings.includeChildDocuments
     });
     input.onProgress?.(34, "\u6574\u7406\u8D44\u6E90");
     consolidateSharedAssets(sharedRoot, targetDir);
@@ -987,7 +1010,7 @@ async function exportDocumentToTarget(options) {
     id: options.docId,
     pdf: false,
     removeAssets: false,
-    merge: true,
+    merge: options.includeChildDocuments,
     savePath: ""
   });
   if (!exportResp || exportResp.code !== 0 || !exportResp.data) {
@@ -1001,7 +1024,7 @@ async function exportDocumentToTarget(options) {
       id: options.docId,
       pdf: false,
       removeAssets: false,
-      merge: true,
+      merge: options.includeChildDocuments,
       savePath: options.targetDir
     });
     if (!savedResp || savedResp.code !== 0 || !savedResp.data) {
@@ -1731,22 +1754,14 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
   }
   openSetting() {
     void this.ensureStoragesLoaded().catch((error) => {
-      (0, import_siyuan3.showMessage)(formatError(error), 5e3, "error");
+      (0, import_siyuan3.showMessage)(formatError2(error), 5e3, "error");
     });
     this.renderPanel();
   }
   renderPanel() {
     this.panel.open(this.getPanelState(), {
       onSaveSettings: async (settings) => {
-        const next = await this.store.updateSettings(settings);
-        const selected = this.storages.find((item) => item.id === next.storageId);
-        if (selected && selected.mount_path !== next.storageMountPath) {
-          await this.store.updateSettings({
-            storageMountPath: selected.mount_path
-          });
-        }
-        (0, import_siyuan3.showMessage)("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58", 2e3, "info");
-        this.rerenderPanel();
+        await this.store.updateSettings(settings);
       },
       onRefreshStorages: async () => {
         await this.refreshStorages(true);
@@ -1778,7 +1793,7 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
           await navigator.clipboard.writeText(url);
           (0, import_siyuan3.showMessage)("\u94FE\u63A5\u5DF2\u590D\u5236", 2e3, "info");
         } catch (error) {
-          (0, import_siyuan3.showMessage)(`\u590D\u5236\u5931\u8D25: ${formatError(error)}`, 4e3, "error");
+          (0, import_siyuan3.showMessage)(`\u590D\u5236\u5931\u8D25: ${formatError2(error)}`, 4e3, "error");
         }
       }
     });
@@ -1895,7 +1910,7 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
     try {
       await task();
     } catch (error) {
-      (0, import_siyuan3.showMessage)(formatError(error), 6e3, "error");
+      (0, import_siyuan3.showMessage)(formatError2(error), 6e3, "error");
     } finally {
       this.busy = false;
       this.rerenderPanel();
@@ -1925,6 +1940,7 @@ var SiSharePlugin = class extends import_siyuan3.Plugin {
       publicBaseUrl: settings.publicBaseUrl,
       previewBaseUrl: settings.previewBaseUrl,
       uploadSharedAssets: settings.uploadSharedAssets,
+      includeChildDocuments: settings.includeChildDocuments,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
       status: "pending",
@@ -1961,9 +1977,9 @@ ${output.warnings.join("\n")}` : "";
         ...baseRecord,
         updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
         status: "failed",
-        lastError: formatError(error)
+        lastError: formatError2(error)
       });
-      this.progress.finish(`\u5931\u8D25\uFF1A${formatError(error)}`, true);
+      this.progress.finish(`\u5931\u8D25\uFF1A${formatError2(error)}`, true);
       this.rerenderPanel();
       throw error;
     }
@@ -1977,6 +1993,7 @@ ${output.warnings.join("\n")}` : "";
       publicBaseUrl: settings.publicBaseUrl,
       previewBaseUrl: settings.previewBaseUrl,
       uploadSharedAssets: settings.uploadSharedAssets,
+      includeChildDocuments: settings.includeChildDocuments,
       updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
       status: "pending",
       lastError: ""
@@ -2012,9 +2029,9 @@ ${output.warnings.join("\n")}` : "";
         ...pending,
         updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
         status: "failed",
-        lastError: formatError(error)
+        lastError: formatError2(error)
       });
-      this.progress.finish(`\u66F4\u65B0\u5931\u8D25\uFF1A${formatError(error)}`, true);
+      this.progress.finish(`\u66F4\u65B0\u5931\u8D25\uFF1A${formatError2(error)}`, true);
       this.rerenderPanel();
       throw error;
     }
@@ -2032,7 +2049,7 @@ ${output.warnings.join("\n")}` : "";
       this.rerenderPanel();
       (0, import_siyuan3.showMessage)("\u5206\u4EAB\u5DF2\u5220\u9664\uFF0C\u4EC5\u5220\u9664\u8BE5\u6587\u6863\u5BF9\u5E94\u8FDC\u7AEF\u76EE\u5F55", 4e3, "info");
     } catch (error) {
-      this.progress.finish(`\u5220\u9664\u5931\u8D25\uFF1A${formatError(error)}`, true);
+      this.progress.finish(`\u5220\u9664\u5931\u8D25\uFF1A${formatError2(error)}`, true);
       throw error;
     }
   }
@@ -2079,6 +2096,6 @@ ${output.warnings.join("\n")}` : "";
     (0, import_siyuan3.showMessage)("S3 \u6302\u8F7D\u5217\u8868\u5DF2\u5237\u65B0", 2e3, "info");
   }
 };
-function formatError(error) {
+function formatError2(error) {
   return error instanceof Error ? error.message : String(error);
 }

@@ -15,6 +15,7 @@ export interface ShareRecord {
   publicBaseUrl: string;
   previewBaseUrl: string;
   uploadSharedAssets: boolean;
+  includeChildDocuments: boolean;
   createdAt: string;
   updatedAt: string;
   status: "success" | "failed" | "pending";
@@ -119,6 +120,7 @@ function normalizeRecord(record: Partial<ShareRecord>): ShareRecord {
     publicBaseUrl: String(record.publicBaseUrl || ""),
     previewBaseUrl: String(record.previewBaseUrl || ""),
     uploadSharedAssets: record.uploadSharedAssets !== false,
+    includeChildDocuments: record.includeChildDocuments === true,
     createdAt: String(record.createdAt || record.updatedAt || now),
     updatedAt: String(record.updatedAt || now),
     status: record.status === "failed" || record.status === "pending" ? record.status : "success",

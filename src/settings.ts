@@ -16,6 +16,7 @@ export interface CloudPagesSettings {
   publicBaseUrl: string;
   previewBaseUrl: string;
   uploadSharedAssets: boolean;
+  includeChildDocuments: boolean;
   slugMode: SlugMode;
 }
 
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: CloudPagesSettings = {
   publicBaseUrl: "",
   previewBaseUrl: "",
   uploadSharedAssets: true,
+  includeChildDocuments: false,
   slugMode: "title-docid",
 };
 
@@ -38,6 +40,7 @@ export function normalizeSettings(input: unknown): CloudPagesSettings {
     publicBaseUrl: String(source.publicBaseUrl || "").trim().replace(/\/+$/, ""),
     previewBaseUrl: String(source.previewBaseUrl || "").trim().replace(/\/+$/, ""),
     uploadSharedAssets: source.uploadSharedAssets !== false,
+    includeChildDocuments: source.includeChildDocuments === true,
     slugMode: source.slugMode === "title" ? "title" : "title-docid",
   };
 }

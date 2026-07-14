@@ -119,10 +119,11 @@ export async function publishToSiyuanCloud(input: PublishInput): Promise<Publish
     const exported = await exportDocumentToTarget({
       docId: input.docId,
       title: input.title,
-      slug,
-      tempRoot,
-      targetDir,
-    });
+    slug,
+    tempRoot,
+    targetDir,
+    includeChildDocuments: input.settings.includeChildDocuments,
+  });
 
     input.onProgress?.(34, "整理资源");
     consolidateSharedAssets(sharedRoot, targetDir);
@@ -267,13 +268,14 @@ async function exportDocumentToTarget(options: {
   slug: string;
   tempRoot: string;
   targetDir: string;
+  includeChildDocuments: boolean;
 }): Promise<{ exportedTitle: string }> {
   const exportStartedAt = Date.now();
   const exportResp = await fetchSyncPost("/api/export/exportHTML", {
     id: options.docId,
     pdf: false,
     removeAssets: false,
-    merge: true,
+    merge: options.includeChildDocuments,
     savePath: "",
   });
   if (!exportResp || exportResp.code !== 0 || !exportResp.data) {
@@ -289,7 +291,7 @@ async function exportDocumentToTarget(options: {
       id: options.docId,
       pdf: false,
       removeAssets: false,
-      merge: true,
+      merge: options.includeChildDocuments,
       savePath: options.targetDir,
     });
     if (!savedResp || savedResp.code !== 0 || !savedResp.data) {

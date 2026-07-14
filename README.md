@@ -99,4 +99,5 @@ npm run build
 - 当前版本对思源 `exportHTML` 的不同小版本行为做了兼容兜底，但没有真实运行环境回归时，仍可能遇到导出目录结构差异
 - `siyuan-cloud /api/share/*` 目前仅作为同步内部元数据的 best-effort 行为，真正外链仍以 `publicBaseUrl` 为准
 - 如果用户关闭 `uploadSharedAssets`，默认假定远端已有 `pages-pub-assets/`
+- 设置修改后会自动保存；“包含子文档”默认关闭，开启后思源导出会合并当前文档下的全部子文档
 - `publicBaseUrl` 的真实可访问性无法在插件内完全保证，只能做基础格式提示

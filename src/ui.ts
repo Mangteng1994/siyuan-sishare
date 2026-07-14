@@ -1,4 +1,4 @@
-import { Dialog } from "siyuan";
+import { Dialog, showMessage } from "siyuan";
 import { safeDecodeUrl } from "./path";
 import { storageLabel, type CloudPagesSettings, type CloudStorageMount } from "./settings";
 import type { ShareRecord } from "./shareStore";
@@ -28,6 +28,7 @@ export class CloudPagesPanel {
   private handlers: PanelHandlers | null = null;
   private searchQuery = "";
   private tokenVisible = false;
+  private settingsSaveQueue: Promise<void> = Promise.resolve();
 
   constructor(pluginName: string) {
     this.pluginName = pluginName;
@@ -63,7 +64,6 @@ export class CloudPagesPanel {
     toolbar.innerHTML = `
       <button class="b3-button b3-button--outline" data-action="publish" ${this.state.busy ? "disabled" : ""}>分享当前文档</button>
       <button class="b3-button b3-button--outline" data-action="refresh" ${this.state.busy ? "disabled" : ""}>刷新 S3 挂载</button>
-      <button class="b3-button" data-action="save" ${this.state.busy ? "disabled" : ""}>保存设置</button>
     `;
     this.root.appendChild(toolbar);
 
@@ -103,6 +103,10 @@ export class CloudPagesPanel {
         <span class="sishare-label">上传 pages-pub-assets</span>
         <input type="checkbox" id="sishare-uploadSharedAssets" ${this.state.settings.uploadSharedAssets ? "checked" : ""}>
       </label>
+      <label class="sishare-field sishare-checkbox">
+        <span class="sishare-label">包含子文档</span>
+        <input type="checkbox" id="sishare-includeChildDocuments" ${this.state.settings.includeChildDocuments ? "checked" : ""}>
+      </label>
     `;
     this.root.appendChild(settings);
     settings.querySelector('[data-action="toggle-token"]')?.addEventListener("click", () => {
@@ -118,10 +122,13 @@ export class CloudPagesPanel {
         button.title = label;
       }
     });
+    settings.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select").forEach((control) => {
+      control.addEventListener("change", () => this.queueSettingsSave());
+    });
 
     const note = document.createElement("div");
     note.className = "sishare-note";
-    note.textContent = "上传目录会直接取源文件根地址中的路径部分；如果填写预览根地址，分享卡片和复制链接会优先使用预览链接。";
+    note.textContent = "设置修改后自动保存。开启“包含子文档”时，分享会合并当前文档下的全部子文档。";
     this.root.appendChild(note);
 
     const shareSection = document.createElement("section");
@@ -153,7 +160,6 @@ export class CloudPagesPanel {
 
     toolbar.querySelector('[data-action="publish"]')?.addEventListener("click", () => this.handlers?.onPublishCurrent());
     toolbar.querySelector('[data-action="refresh"]')?.addEventListener("click", () => this.handlers?.onRefreshStorages());
-    toolbar.querySelector('[data-action="save"]')?.addEventListener("click", () => this.saveSettingsFromForm());
   }
 
   private renderShareRecords(list: HTMLElement | null, count: HTMLElement | null): void {
@@ -178,12 +184,12 @@ export class CloudPagesPanel {
     }
   }
 
-  private async saveSettingsFromForm(): Promise<void> {
-    if (!this.root || !this.handlers) return;
+  private readSettingsFromForm(): Partial<CloudPagesSettings> | null {
+    if (!this.root) return null;
     const storageIdValue = (this.root.querySelector("#sishare-storageId") as HTMLSelectElement | null)?.value || "";
     const storageId = storageIdValue ? Number(storageIdValue) : null;
     const storage = this.state?.storages.find((item) => item.id === storageId) || null;
-    await this.handlers.onSaveSettings({
+    return {
       cloudToken: (this.root.querySelector("#sishare-cloudToken") as HTMLInputElement | null)?.value || "",
       storageId,
       storageMountPath: storage?.mount_path || "",
@@ -191,7 +197,20 @@ export class CloudPagesPanel {
       previewBaseUrl: (this.root.querySelector("#sishare-previewBaseUrl") as HTMLInputElement | null)?.value || "",
       slugMode: (this.root.querySelector("#sishare-slugMode") as HTMLSelectElement | null)?.value === "title" ? "title" : "title-docid",
       uploadSharedAssets: !!(this.root.querySelector("#sishare-uploadSharedAssets") as HTMLInputElement | null)?.checked,
-    });
+      includeChildDocuments: !!(this.root.querySelector("#sishare-includeChildDocuments") as HTMLInputElement | null)?.checked,
+    };
+  }
+
+  private queueSettingsSave(): void {
+    const settings = this.readSettingsFromForm();
+    const handlers = this.handlers;
+    if (!settings || !handlers) return;
+    this.settingsSaveQueue = this.settingsSaveQueue
+      .catch(() => {})
+      .then(() => handlers.onSaveSettings(settings))
+      .catch((error) => {
+        showMessage(`设置保存失败: ${formatError(error)}`, 5000, "error");
+      });
   }
 
   private createShareCard(record: ShareRecord): HTMLElement {
@@ -312,6 +331,10 @@ function formatDateTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function tokenVisibilityIcon(visible: boolean): string {
